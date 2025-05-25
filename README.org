@@ -1,0 +1,77 @@
+#+title: Custom RSS
+
+** What is it
+
+This project scrapes different HTML pages to generate a [[https://en.wikipedia.org/wiki/RSS][RSS feed]] for each of
+them, this way one can conveniently be notified when an entry is published.
+
+The current feeds are provided under the following paths:
+- [[https://marmenormarmayor.es/El-blog-de-Isabel/index.html][/blog-isabel/feed]]
+- [[https://elclickverde.com/blog][/verde/blog/feed]]
+- [[https://elclickverde.com/reportajes][/verde/reportajes/feed]]
+
+** How to build it
+
+Only a basic Rust toolchain is needed. This project provides a =Justfile= to
+simplify some steps.
+
+#+begin_src shell
+# For Debug builds
+
+## Using cargo
+$ cargo build --profile dev
+
+## Using just
+$ just build dev
+
+# For Release builds
+
+## Using cargo
+$ cargo build --profile release
+
+## Using just
+$ just build release
+#+end_src
+
+** How to run it
+
+Likewise, you can run it using the Rust toolchain, also =Justfile= provides some
+shortcuts.
+
+#+begin_src shell
+# For Debug runs
+
+## Using cargo
+$ cargo run --profile dev
+
+## Using just
+$ just run dev
+
+# For Release runs
+
+## Using cargo
+$ cargo run --profile release
+
+## Using just
+$ just run release
+#+end_src
+
+The environment variable ~RUST_LOG~ can be used to print logs of the program.
+See [[https://docs.rs/env_logger/latest/env_logger/#enabling-logging][the documentation of env_logger]] for more information.
+
+Usage of the binary is explained by providing the flag =-h= or =--help= to the
+binary.
+
+** Pending tasks [0/7]
+- [ ] Add testing and coverage.
+- [ ] Add CI pipeline to automatize checks.
+- [ ] In some pages, the entries are written manually, so sometimes there are
+  typos that this program currently can't handle. Make the RSS parser typo
+  proof, like wrong formatting for date, wrong position of arguments, etc., at
+  least for the most common and predictable errors.
+- [ ] Add a Nix flake to generate the development environment and the binary.
+- [ ] Generate better logs, like information about the client that makes a
+  request.
+- [ ] See if the error treatment can be done better (less verbose, without
+  panics, reducing binary size).
+- [ ] Improve pre commit hooks.

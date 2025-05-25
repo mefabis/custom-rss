@@ -1,0 +1,26 @@
+[package]
+name = "custom-rss"
+description = "Custom RSS for blogs that don't have them"
+repository = "https://github.com/mefabis/custom-rss"
+version = "0.1.0"
+edition = "2024"
+authors = [
+  "Eduardo Martinez Martinez <eduardo@monte.blue>"
+]
+license = "AGPL-3.0-only"
+
+[dependencies]
+anyhow = "1.0.98"
+axum = "0.8.3"
+chrono = "0.4.40"
+chrono-tz = "0.10.3"
+env_logger = "0.11.8"
+lexopt = "0.3.1"
+log = "0.4.27"
+reqwest = "0.12.15"
+rss = "2.0.12"
+scraper = "0.23.1"
+tokio = { version = "1.44.2", features = ["full"] }
+
+[profile.release]
+strip = true
