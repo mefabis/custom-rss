@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: 2025 Eduardo Martinez Martinez <eduardo@monte.blue>
 // SPDX-License-Identifier: AGPL-3.0-only
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Result, anyhow};
 use axum::{http::StatusCode, response::IntoResponse};
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use chrono_tz::Europe::Madrid;
 use log::error;
 use rss::{ChannelBuilder, Guid, ItemBuilder};
 use scraper::{Html, Selector};
+use std::sync::LazyLock;
 
 use crate::rss_utils;
 
@@ -17,6 +18,15 @@ const BLOG_URL_PARSER_SECTION: &str = ".blogsection";
 const BLOG_URL_PARSER_TITLE: &str = "h3.blogtitle a";
 const BLOG_URL_PARSER_DATE: &str = ".blogdate";
 const BLOG_URL_PARSER_CONTENT: &str = ".blogcontent";
+
+static SELECTOR_SELECTION: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(BLOG_URL_PARSER_SECTION).unwrap());
+static SELECTOR_TITLE: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(BLOG_URL_PARSER_TITLE).unwrap());
+static SELECTOR_DATE: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(BLOG_URL_PARSER_DATE).unwrap());
+static SELECTOR_CONTENT: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(BLOG_URL_PARSER_CONTENT).unwrap());
 
 fn parse_date(date: &str) -> Result<String> {
     let s: Vec<&str> = date.split_whitespace().collect();
@@ -60,18 +70,6 @@ fn parse_date(date: &str) -> Result<String> {
 async fn parse_content() -> Result<impl IntoResponse> {
     let content = reqwest::get(BLOG_URL_ARCHIVE).await?.text().await?;
     let document = Html::parse_document(&content);
-    let selector_section = Selector::parse(BLOG_URL_PARSER_SECTION)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse section selector")?;
-    let selector_title = Selector::parse(BLOG_URL_PARSER_TITLE)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse title selector")?;
-    let selector_date = Selector::parse(BLOG_URL_PARSER_DATE)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse date selector")?;
-    let selector_content = Selector::parse(BLOG_URL_PARSER_CONTENT)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse content selector")?;
 
     let mut rss_channel = ChannelBuilder::default()
         .title("El blog de Isabel")
@@ -79,28 +77,28 @@ async fn parse_content() -> Result<impl IntoResponse> {
         .description("Últimas entradas del blog de Isabel")
         .build();
 
-    for element in document.select(&selector_section) {
+    for element in document.select(&SELECTOR_SELECTION) {
         let title = element
-            .select(&selector_title)
+            .select(&SELECTOR_TITLE)
             .next()
             .map(|e| e.text().collect::<String>().trim().to_string())
             .ok_or_else(|| anyhow!("Unable to parse title"))?;
 
         let date = element
-            .select(&selector_date)
+            .select(&SELECTOR_DATE)
             .next()
             .map(|e| e.text().collect::<String>().trim().to_string())
             .ok_or_else(|| anyhow!("Unable to parse date"))?;
         let date = parse_date(date.as_str())?;
 
         let content = element
-            .select(&selector_content)
+            .select(&SELECTOR_CONTENT)
             .next()
             .map(|e| e.text().collect::<String>().trim().to_string())
             .ok_or_else(|| anyhow!("Unable to parse content"))?;
 
         let link = element
-            .select(&selector_title)
+            .select(&SELECTOR_TITLE)
             .next()
             .and_then(|e| e.value().attr("href"))
             .map(|s| format!("{}{}", BLOG_URL_BLOG, s))
@@ -131,4 +129,18 @@ pub async fn rss() -> impl IntoResponse {
             error!("Error parsing the content of the HTML: {e}");
             StatusCode::NO_CONTENT.into_response()
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lazy_lock_no_panic() {
+        let dull_document = Html::new_document();
+        let _ = dull_document.select(&SELECTOR_SELECTION);
+        let _ = dull_document.select(&SELECTOR_TITLE);
+        let _ = dull_document.select(&SELECTOR_DATE);
+        let _ = dull_document.select(&SELECTOR_CONTENT);
+    }
 }
