@@ -4,8 +4,8 @@ help:
 
 # Build the project without running
 build profile:
-    cargo build --profile {{profile}}
+    cargo build --profile {{ profile }}
 
 # Build and run the project
 run profile:
-    cargo run --profile {{profile}}
+    cargo run --profile {{ profile }}
