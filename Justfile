@@ -4,8 +4,17 @@ help:
 
 # Build the project without running
 build profile:
-    cargo build --profile {{profile}}
+    cargo build --profile {{ profile }}
 
 # Build and run the project
 run profile:
-    cargo run --profile {{profile}}
+    cargo run --profile {{ profile }}
+
+# Build and test the project
+test profile:
+    cargo test --profile {{ profile }}
+
+# Apply all formatters to the project
+format:
+    cargo fmt
+    just --unstable --fmt
