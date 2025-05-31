@@ -13,3 +13,8 @@ run profile:
 # Build and test the project
 test profile:
     cargo test --profile {{ profile }}
+
+# Apply all formatters to the project
+format:
+    cargo fmt
+    just --unstable --fmt
