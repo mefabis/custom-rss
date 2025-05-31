@@ -9,3 +9,7 @@ build profile:
 # Build and run the project
 run profile:
     cargo run --profile {{ profile }}
+
+# Build and test the project
+test profile:
+    cargo test --profile {{ profile }}
