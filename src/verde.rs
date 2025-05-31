@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: 2025 Eduardo Martinez Martinez <eduardo@monte.blue>
 // SPDX-License-Identifier: AGPL-3.0-only
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Result, anyhow};
 use axum::{http::StatusCode, response::IntoResponse};
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use chrono_tz::Europe::Madrid;
 use log::error;
 use rss::{ChannelBuilder, Guid, ItemBuilder};
 use scraper::{Html, Selector, selectable::Selectable};
+use std::sync::LazyLock;
 
 use crate::rss_utils;
 
@@ -22,6 +23,19 @@ const BLOG_URL_PARSER_RIGHT: &str = ".group-right";
 const BLOG_URL_PARSER_EVEN_DESCRIPTION: &str = "p:not(.rteright)";
 const BLOG_URL_PARSER_EVEN_DATE: &str = "p.rteright span";
 
+static BLOG_SELECTOR_ENTRY: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(BLOG_URL_PARSER_ENTRY).unwrap());
+static BLOG_SELECTOR_HEADER: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(BLOG_URL_PARSER_HEADER).unwrap());
+static BLOG_SELECTOR_EVEN_HEADER: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(BLOG_URL_PARSER_EVEN_HEADER).unwrap());
+static BLOG_SELECTOR_RIGHT: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(BLOG_URL_PARSER_RIGHT).unwrap());
+static BLOG_SELECTOR_EVEN_DESCRIPTION: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(BLOG_URL_PARSER_EVEN_DESCRIPTION).unwrap());
+static BLOG_SELECTOR_EVEN_DATE: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(BLOG_URL_PARSER_EVEN_DATE).unwrap());
+
 // reportajes
 const REPORTAJES_URL: &str = "https://elclickverde.com/reportajes";
 const REPORTAJES_URL_PARSER_ENTRY: &str = ".views-row";
@@ -31,27 +45,21 @@ const REPORTAJES_URL_PARSER_DESCRIPTION: &str =
 const REPORTAJES_URL_PARSER_DATE: &str = "div.field.field--name-post-date";
 const REPORTAJES_URL_PARSER_INNER_DATE: &str = "div.field__item.even";
 
+static REPORTAJES_SELECTOR_ENTRY: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(REPORTAJES_URL_PARSER_ENTRY).unwrap());
+static REPORTAJES_SELECTOR_HEADER: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(REPORTAJES_URL_PARSER_HEADER).unwrap());
+static REPORTAJES_SELECTOR_DESCRIPTION: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(REPORTAJES_URL_PARSER_DESCRIPTION).unwrap());
+static REPORTAJES_SELECTOR_P: LazyLock<Selector> = LazyLock::new(|| Selector::parse("p").unwrap());
+static REPORTAJES_SELECTOR_DATE: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(REPORTAJES_URL_PARSER_DATE).unwrap());
+static REPORTAJES_SELECTOR_INNER_DATE: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse(REPORTAJES_URL_PARSER_INNER_DATE).unwrap());
+
 async fn parse_blog() -> Result<impl IntoResponse> {
     let content = reqwest::get(BLOG_URL).await?.text().await?;
     let document = Html::parse_document(&content);
-    let selector_entry = Selector::parse(BLOG_URL_PARSER_ENTRY)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse entry selector")?;
-    let selector_header = Selector::parse(BLOG_URL_PARSER_HEADER)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse header selector")?;
-    let selector_even_header = Selector::parse(BLOG_URL_PARSER_EVEN_HEADER)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse even header selector")?;
-    let selector_right = Selector::parse(BLOG_URL_PARSER_RIGHT)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse right selector")?;
-    let selector_even_description = Selector::parse(BLOG_URL_PARSER_EVEN_DESCRIPTION)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse even description selector")?;
-    let selector_even_date = Selector::parse(BLOG_URL_PARSER_EVEN_DATE)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse date selector")?;
 
     let mut rss_channel = ChannelBuilder::default()
         .title("Blog | elclickverde")
@@ -59,12 +67,12 @@ async fn parse_blog() -> Result<impl IntoResponse> {
         .description("Últimas entradas del blog de elclickverde")
         .build();
 
-    for element in document.select(&selector_entry) {
+    for element in document.select(&BLOG_SELECTOR_ENTRY) {
         let (title, url) = {
             let header = element
-                .select(&selector_header)
+                .select(&BLOG_SELECTOR_HEADER)
                 .next()
-                .and_then(|h| h.select(&selector_even_header).next())
+                .and_then(|h| h.select(&BLOG_SELECTOR_EVEN_HEADER).next())
                 .ok_or_else(|| anyhow!("Unable to parse header"))?;
 
             let url = header
@@ -80,19 +88,19 @@ async fn parse_blog() -> Result<impl IntoResponse> {
 
         let (description, date) = {
             let right = element
-                .select(&selector_right)
+                .select(&BLOG_SELECTOR_RIGHT)
                 .next()
                 .ok_or_else(|| anyhow!("Unable to parse right"))?;
 
             let description = right
-                .select(&selector_even_description)
+                .select(&BLOG_SELECTOR_EVEN_DESCRIPTION)
                 .next()
                 .map(|p| p.text().collect::<String>().trim().to_string())
                 .ok_or_else(|| anyhow!("Unable to parse even description"))?;
 
             let date = {
                 let text = right
-                    .select(&selector_even_date)
+                    .select(&BLOG_SELECTOR_EVEN_DATE)
                     .next()
                     .map(|span| span.text().collect::<String>().trim().to_string())
                     .ok_or_else(|| anyhow!("Unable to parse even date"))?;
@@ -174,29 +182,10 @@ async fn parse_reportajes() -> Result<impl IntoResponse> {
         .description("Últimos reportajes de elclickverde")
         .build();
 
-    let selector_entry = Selector::parse(REPORTAJES_URL_PARSER_ENTRY)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse entry selector")?;
-    let selector_header = Selector::parse(REPORTAJES_URL_PARSER_HEADER)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse header selector")?;
-    let selector_description = Selector::parse(REPORTAJES_URL_PARSER_DESCRIPTION)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse description selector")?;
-    let selector_p = Selector::parse("p")
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse p selector")?;
-    let selector_date = Selector::parse(REPORTAJES_URL_PARSER_DATE)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse date selector")?;
-    let selector_inner_date = Selector::parse(REPORTAJES_URL_PARSER_INNER_DATE)
-        .map_err(|e| anyhow!(e.to_string()))
-        .context("Failed to parse inner date selector")?;
-
-    for element in document.select(&selector_entry) {
+    for element in document.select(&REPORTAJES_SELECTOR_ENTRY) {
         let (title, url) = {
             let header = element
-                .select(&selector_header)
+                .select(&REPORTAJES_SELECTOR_HEADER)
                 .next()
                 .ok_or_else(|| anyhow!("Unable to parse header"))?;
 
@@ -213,10 +202,10 @@ async fn parse_reportajes() -> Result<impl IntoResponse> {
 
         let description = {
             let desc = element
-                .select(&selector_description)
+                .select(&REPORTAJES_SELECTOR_DESCRIPTION)
                 .next()
                 .ok_or_else(|| anyhow!("Unable to parse description"))?;
-            let mut p_tags = desc.select(&selector_p);
+            let mut p_tags = desc.select(&REPORTAJES_SELECTOR_P);
             p_tags
                 .nth(1)
                 .map(|tag| tag.text().collect::<String>().trim().to_string())
@@ -225,9 +214,9 @@ async fn parse_reportajes() -> Result<impl IntoResponse> {
 
         let date = {
             let div_date = element
-                .select(&selector_date)
+                .select(&REPORTAJES_SELECTOR_DATE)
                 .next()
-                .and_then(|h| h.select(&selector_inner_date).next())
+                .and_then(|h| h.select(&REPORTAJES_SELECTOR_INNER_DATE).next())
                 .ok_or_else(|| anyhow!("Unable to parse inner date"))?;
 
             let date_raw = div_date.text().collect::<String>().trim().to_string();
@@ -270,4 +259,28 @@ pub async fn reportajes_rss() -> impl IntoResponse {
             error!("Error parsing the content of the HTML: {e}");
             StatusCode::NO_CONTENT.into_response()
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lazy_lock_no_panic() {
+        let dull_document = Html::new_document();
+
+        // Blog
+        let _ = dull_document.select(&BLOG_SELECTOR_ENTRY);
+        let _ = dull_document.select(&BLOG_SELECTOR_HEADER);
+        let _ = dull_document.select(&BLOG_SELECTOR_EVEN_HEADER);
+        let _ = dull_document.select(&BLOG_SELECTOR_RIGHT);
+        let _ = dull_document.select(&BLOG_SELECTOR_EVEN_DESCRIPTION);
+
+        // Reportajes
+        let _ = dull_document.select(&REPORTAJES_SELECTOR_ENTRY);
+        let _ = dull_document.select(&REPORTAJES_SELECTOR_HEADER);
+        let _ = dull_document.select(&REPORTAJES_SELECTOR_DESCRIPTION);
+        let _ = dull_document.select(&REPORTAJES_SELECTOR_P);
+        let _ = dull_document.select(&REPORTAJES_SELECTOR_INNER_DATE);
+    }
 }
